@@ -1,0 +1,2301 @@
+#! /bin/sh
+#
+# Modified from:
+#     @(#)whatami,v3.0                  (Wayne.Thompson@Sun.COM) 07/21/92
+# by CMDR, 2002-01-29
+#
+PATH=/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin:/sbin:/usr/sbin:/usr/local/sbin
+MYNAME=`basename $0`
+#
+# Author:
+#     Wayne Thompson (w/contributions from Wolfgang Bachhuber)
+#
+# Synopsis:
+usage=`sed -e "s/^ *//" << endusage
+      usage: $MYNAME [-h]
+endusage`
+#
+# Description:
+#     This script outputs various system/user specific bits of information
+#     which may be useful to System Administrators.
+#
+# Example Output:
+#
+#     SunOS 5.x:
+#                    DATE: Sun Jul  5 11:05:30 PDT 1992
+#                    USER: root
+#                HOSTNAME: le0 = anywhere
+#              IP ADDRESS: le0 = 129.150.30.23
+#                   MODEL: SUNW,Sun 4/75
+#         FRAME BUFFER(S): cgthree
+#           SunOS RELEASE: 5.0.1
+#                    TYPE: homeless
+#         HOME FILESERVER: mirrors
+#                  MEMORY: 32MB
+#                    SWAP: 53.4MB total, 25.6MB used, 27.8MB available
+#            LOAD AVERAGE: 1.01, 0.58, 0.58
+#          DNS DOMAINNAME: EBay.Sun.COM
+#          NIS DOMAINNAME: mlpirws.EBay.Sun.COM
+#      SOFTWARE SERVER(S): speedo1
+#         DEFAULT PRINTER: pug
+#        ETHERNET ADDRESS: 8:0:20:e:47:6d
+#                  HOSTID: 5540a99d
+#                    DISK: c0t3d0 "SUN0207" (208MB unformatted)
+#               PARTITION: c0t3d0s0 mounted on / (11MB, 87% full)
+#               PARTITION: c0t3d0s6 mounted on /usr (127MB, 100% full)
+#          SWAP PARTITION: c0t3d0s1 (32MB)
+#                   CDROM: c0t6d0
+#                  FLOPPY: fd0 (3.5-inch floppy)
+#                    TAPE: rst4 - Archive QIC-150 tape drive (150MB)
+#
+#     SunOS 4.x:
+#                    DATE: Sun Jul  5 11:04:37 PDT 1992
+#                    USER: me
+#                HOSTNAME: le0 = mirrors
+#              IP ADDRESS: le0 = 129.150.30.117
+#                   MODEL: Sun 4/60
+#         FRAME BUFFER(S): cgsix
+#           SunOS RELEASE: 4.1.1
+#               KERNEL ID: GENERIC.md
+#                    TYPE: standalone
+#                  MEMORY: 16MB
+#                    SWAP: 47.9MB total, 21.4MB used, 26.5MB available
+#            LOAD AVERAGE: 0.50, 0.14, 0.04
+#          DNS DOMAINNAME: EBay.Sun.COM
+#          NIS DOMAINNAME: mlpirws.EBay.Sun.COM
+#      SOFTWARE SERVER(S): speedo1
+#         DEFAULT PRINTER: pug
+#        ETHERNET ADDRESS: 8:0:20:7:e9:d8
+#                  HOSTID: 5100745b
+#           METAPARTITION: md0h mounted on /home (1487MB, 89% full)
+#                    DISK: sd0 "SUN0207" (208MB unformatted)
+#               PARTITION: sd0a mounted on / (13MB, 75% full)
+#               PARTITION: sd0g mounted on /usr (112MB, 80% full)
+#                    DISK: sd1 "SUN0327" (327MB unformatted)
+#               PARTITION: sd1c part of md0h
+#                    DISK: sd2 "SUN0669" (669MB unformatted)
+#               PARTITION: sd2c part of md0h
+#                    DISK: sd3 "SUN0669" (669MB unformatted)
+#               PARTITION: sd3c part of md0h
+#                  FLOPPY: fd0 (3.5-inch floppy)
+#                    TAPE: rst0 - Archive QIC-150 tape drive (150MB)
+#
+#     Both HOSTNAME and IP ADDRESS contain the network interface (i.e. le0).
+#     Should a machine be configured for more than one interface, there would
+#     be multiple entries for HOSTNAME and IP ADDRESS.
+#
+#     TYPE knows about the "official" definitions:
+#
+#         disk-resource STANDALONE      DATALESS        DISKLESS
+#
+#         /             ufs             ufs             nfs
+#         swap          spec            spec            nfs
+#         /usr          ufs             nfs             nfs
+#         /home         ufs             nfs             nfs
+#
+#     And the following "unofficial" definitions:
+#
+#         disk-resource HOMELESS        SWAPFUL         SERVER
+#
+#         /             ufs             nfs             (exports
+#         swap          spec            spec             /export
+#         /usr          ufs             nfs              /exec
+#         /home         nfs             nfs              /*)
+#
+#     If whatami can't determine the disk resource type of any of the
+#     four resources, type will be "unknown".
+#
+#         TYPE: unknown (/=ufs, swap=unknown, /usr=ufs, /home=nfs)
+#
+#     If all the resource types can be identified and they don't match
+#     any of the above definitions, then type will be "undefined".
+#
+#         TYPE: undefined (/=ufs, swap=nfs, /usr=ufs, /home=ufs)
+#
+#     SOFTWARE SERVER(S) is path-order sensitive. For example, my PATH:
+#         . /home/me/bin /home/me/.dist
+#         /usr/ucb /bin /usr/bin
+#         /usr/dist/exe /usr/dist/local/exe     = hologram:/usr/dist
+#         /usr/sds/exe /usr/sds/local/exe       = eb1sds1:/usr/sds
+#         ...
+#
+#     NOTE:
+#         SOFTWARE SERVER(S) will only show up if they are referenced
+#         by the current path.
+#
+# Options:
+#     -h        print command description.
+#
+# Environment:
+#     PRINTER   default printer.
+#     HOME      user's home directory.
+#
+# Files:
+#     /usr/include/mon/idprom.h <i/o    idprom header file
+#     /usr/adm/messages*        <i/o    system messages
+#     /etc/passwd               <i/o    system password file
+#     /etc/format.dat           <i/o    disk format data file
+#     /etc/{mtab,mnttab}        <i/o    mounted file system table
+#     /vmunix                   <i/o    4.x kernel
+#
+# Diagnostics:
+#     Exit Status:
+#         0     normal termination
+#         1     abnormal termination
+#
+#     Errors (stderr):
+#         usage
+#         "unable to contact portmapper on localhost."
+#
+#     Warnings (stderr):
+#
+#     Info (stdout):
+#
+# Dependencies:
+#
+# Caveats:
+#     A CDROM will only show up if a disc is loaded. This is a function
+#         of the driver.
+#
+# Bugs:
+#     SunOS 4.x: Some information is derived from dmesg(8) and
+#                /usr/adm/messages*. Information which has been
+#                flushed will result in:
+#                    <DESCRIPTION>: unknown
+#
+#     SunOS 5.x: Root privilege is required to obtain some information.
+#                Don't know exactly where 5.x metastat will live or what
+#                its output will look like.
+#
+
+# >> BEGIN parse options >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #
+
+while [ $# -gt 0 ]
+do
+    case $1 in
+        -h)                                     # help
+            awk '
+                /^$/ {
+                    exit;
+                }
+
+                /^[# :]/ && NR > 1 {
+                    print substr ($0, 3);
+                }
+            ' $0 |
+            sed "
+                /^$/{
+                    N
+                    /^\n$/D
+                }
+                s/\$MYNAME/$MYNAME/
+            "
+            exit 0
+            ;;
+
+        --)                                     # end of options
+            shift
+            break
+            ;;
+
+        -*)
+            echo >&2 "$MYNAME: error: $1: unknown option."
+            echo >&2 "$usage"
+            exit 1
+            ;;      
+
+        *)                                      # end of options
+            break
+            ;;
+    esac
+done
+
+# << END parse options <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< #
+
+# >> BEGIN parse arguments >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #
+
+case $# in
+    0)
+        ;;
+
+    *)
+        echo >&2 "$MYNAME: error: unexpected argument(s)."
+        echo >&2 "$usage"
+        exit 1
+        ;;      
+esac
+
+# << END parse arguments <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< #
+
+# >> BEGIN initialization >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #
+
+## >> BEGIN function: arch >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+# Function:
+#     @(#)arch,v1.1                     (Wayne.Thompson@Sun.COM) 05/14/92
+#
+# Description:
+#     This function emulates 4.x arch(1).
+#
+# Variables:
+#
+# Usage:
+#     arch
+#     arch -k
+#     arch archname
+#
+# Return:
+#     0 success
+#     1 non-success
+#
+# Dependencies:
+#     This function works under SunOs 3.x - 5.x.
+#
+# Bugs:
+#
+
+arch () {
+    case $1 in
+        '')
+            arch $* 2>&- || expr `uname -m` : '\(sun[0-9]*\)'
+            ;;
+
+        -k)
+            arch $* 2>&- || uname -m
+            ;;
+
+        *)
+            if [ -x arch ]
+            then
+                arch $*
+            else
+                [ $* = `expr \`uname -m\` : '\(sun[0-9]*\)'` ]
+            fi
+            ;;
+    esac
+}
+
+## << END function: arch <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+DF () {
+    df $1 2>&- |
+    awk '
+        /^[Ff]ilesystem/ {
+            getline;
+            print "DF", "'"$1"'", $1;
+        }
+    '
+}
+
+## >> BEGIN function: hostname >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+# Function:
+#     @(#)hostname,v1.0                 (Wayne.Thompson@Sun.COM) 02/15/92
+#
+# Description:
+#     This function emulates 4.x hostname(1) given no arguments.
+#
+# Variables:
+#
+# Usage:
+#     hostname
+#
+# Return:
+#
+# Dependencies:
+#     This funcion works under SunOs 3.x - 5.x.
+#
+# Bugs:
+#
+
+hostname () {
+    hostname 2>&- || uname -n
+}
+
+## << END function: hostname <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN function: osr >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+# Function:
+#     @(#)osr,v1.0                      (Wayne.Thompson@Sun.COM) 02/08/92
+#
+# Description:
+#     This function outputs the numeric portion of the current OS release.
+#
+# Variables:
+#
+# Usage:
+#     os=`osr`
+#
+# Return:
+#     0 success
+#     1 non-success
+#
+# Dependencies:
+#     This funcion works under SunOs 3.x - 5.x.
+#
+# Bugs:
+#
+
+osr () {
+    expr `
+        {
+            uname -r ||
+            cat /usr/sys/conf*/RELEASE
+        } 2>&- ||
+        /etc/dmesg |
+        awk '
+            BEGIN { status = 1 }
+            /^SunOS Release/ { print $3; status = 0; exit }
+            END { exit status }
+        ' ||
+        expr "\`
+            /usr/ucb/strings -50 /vmunix |
+            egrep '^SunOS Release'
+        \`" : 'SunOS Release \([^ ]*\)'
+    ` : '\([.0-9]*\)'
+}
+
+## << END function: osr <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN function: whoami >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+# Function:
+#     @(#)whoami,v1.0                   (Wayne.Thompson@Sun.COM) 03/20/92
+#
+# Description:
+#     This function emulates 4.x whoami(1).
+#
+# Variables:
+#
+# Usage:
+#     whoami
+#
+# Return:
+#
+# Dependencies:
+#     This funcion works under SunOs 3.x - 5.x.
+#
+# Bugs:
+#
+
+whoami () {
+    /usr/ucb/whoami 2>&- ||
+    expr "`id`" : '[^(]*(\([^)]*\)'
+}
+
+## << END function: whoami <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+tab="`awk 'BEGIN {printf ("\""%c"\"", 9);exit;}'`"
+os=`osr`
+case $os in
+    5*)
+        SVR4=1
+        ARP=/usr/sbin/arp
+        PING=ping
+        NETSTAT=netstat
+        IFCONFIG=/usr/sbin/ifconfig
+        UPTIME=/usr/bin/uptime
+        SHOWMOUNT=/usr/lib/fs/nfs/showmount
+        sysdef=`/usr/sbin/sysdef 2>&-`
+        devinfo=`/usr/sbin/sysdef -d 2>&-`
+        prtconf=`/usr/sbin/prtconf -v 2>&-`
+        ;;
+
+    *)
+        ARP=arp
+        PING=ping
+        NETSTAT=netstat
+        IFCONFIG=ifconfig
+        UPTIME=uptime
+        SHOWMOUNT=showmount
+        devinfo=`/usr/etc/devinfo 2>&-`
+        ;;
+esac
+login=`whoami`
+hostname=`hostname`
+hostid=`
+    hostid 2>&- || {
+        /etc/sysdef -h 2>&- |
+        awk '$1 != "*" {print $1}'
+    }
+`
+archk=`arch -k`
+domainname=`domainname`
+namesvc=files
+if rpcinfo -u $hostname ypbind 2>&- 1>&-
+then
+    nis=true
+    namesvc=nis
+fi
+if nistest org_dir.$domainname 2>&-
+then
+    nisplus=true
+    namesvc=nisplus
+fi
+offset=20                                       # info offset
+fbs=
+ETHER=unknown
+KERNELID=unknown
+MEM=unknown
+RELEASE=unknown
+SWAP=unknown
+FB=unknown
+eval `
+    dmesg 2>&- |
+    awk '
+        /^Ethernet address =/ {
+            ether = $NF;
+            next;
+        }
+
+        /^mem =/ {
+            mem = $3;
+            next;
+        }
+
+        /\) #[1-9]/ {
+            for (i = 1; i <= NF; i++)
+                if ($i ~ /^\(/) break;
+            release  = $(i-1);
+            kernelid = $i;
+            next;
+        }
+
+        /^swap on/ {
+            for (i = 1; i <= NF; i++)
+                if ($i == "fstype") break;
+            swap = $++i;
+            next;
+        }
+
+        /^(((cg|bw|gp).*[0-9])|taac[0-9]) at/ {
+            fbs[$1]++;
+            if (fb) {
+                if (fbs[$1] == 1)
+                    fb = fb", "$1;
+            }
+            else {
+                fb = $1;
+            }
+            next;
+        }
+
+        /^fd[0-9] at obio/ {
+            floppy[++fdi] = $1;
+            next;
+        }
+
+        /: </ {
+            devi = index($0, "<") + 1;
+            devids[substr($1, 1, length($1) - 1)] =\
+                substr($0, devi, length($0) - devi);
+            next;
+        }
+
+        END {
+            if (ether)   printf ("ETHER=%s;", ether);
+            if (mem)     printf ("MEM=%sMB;"                    \
+                , substr (mem, 1, length (mem) - 1) / 1024);
+            if (release) printf ("RELEASE=%s;KERNELID=%s;"      \
+                , release                                       \
+                , substr (kernelid, 2, length (kernelid) - 2)   \
+            );
+            if (swap)    printf ("SWAP=%s;", swap);
+            if (fb)      printf ("FB=\"%s\";", fb);
+            if (fdi) {
+                for (i = 1; i <= fdi; i++) {
+                    printf ("%s=1;", floppy[i]);
+                }
+            }
+            if (devi) {
+                printf ("devs=\"devs;");
+                for (devid in devids) {
+                    printf ("%s=%s;", devid, devids[devid]);
+                }
+                printf ("\";");
+            }
+        }
+    '
+`
+
+if [ $SVR4 ]
+then
+    SWAP=`
+        /usr/sbin/swap -l |
+        awk '
+            NR == 3 {
+                if ($1 ~ /\/dev/) {
+                    print "spec";
+                }
+                else {
+                    print "nfs";
+                }
+                exit;
+            }
+        '
+    `
+else
+    for file in /var/adm/messages*
+    do
+	[ -r $file ] && break
+        [ "$ETHER"    != unknown ] &&
+        [ "$KERNELID" != unknown ] &&
+        [ "$MEM"      != unknown ] &&
+        [ "$RELEASE"  != unknown ] &&
+        [ "$SWAP"     != unknown ] &&
+        [ "$FB"       != unknown ] &&
+            break
+        eval `
+            awk '
+                BEGIN {
+                    if ("'"$FB"'" != "unknown") {
+                        fb = "'"$FB"'";
+                        for (i = i ;i <= split ("'"$FB"'", x, ","); i++)
+                            if (x[i]) fbs[x[i]]++;
+                    }
+                }
+
+                /: Ethernet address =/ {
+                    ether = $NF;
+                    next;
+                }
+
+                /: mem =/ {
+                    mem = $8;
+                    next;
+                }
+
+                /\) #[1-9]/ {
+                    for (i = 1; i <= NF; i++)
+                        if ($i ~ /^\(/) break;
+                    release  = $(i-1);
+                    kernelid = $i;
+                    next;
+                }
+
+                /: swap on/ {
+                    for (i = 1; i <= NF; i++)
+                        if ($i == "fstype") break;
+                    swap = $++i;
+                    next;
+                }
+
+
+                /: (((cg|bw|gp).*[0-9])|taac[0-9]) at/ {
+                    for (i = 1; i <= NF; i++)
+                        if ($i ~ /^(((cg|bw|gp).*[0-9])|taac[0-9])/)
+                            break;
+                    fbs[$i]++;
+                    if (fb) {
+                        if (fbs[$i] == 1)
+                            fb = fb", "$i;
+                    }
+                    else {
+                        fb = $i;
+                    }
+                    next;
+                }
+
+                END {
+                    if (ether && "'"$ETHER"'" == "unknown")
+                        printf ("ETHER=%s;", ether);
+                    if (mem && "'"$MEM"'" == "unknown")
+                        printf ("MEM=%sMB;"                                 \
+                            , substr (mem, 1, length (mem) - 1) / 1024);
+                    if (release && "'"$RELEASE"'" == "unknown")
+                        printf ("RELEASE=%s;KERNELID=%s;"                   \
+                            , release                                       \
+                            , substr (kernelid, 2, length (kernelid) - 2)   \
+                    );
+                    if (swap && "'"$SWAP"'" == "unknown")
+                        printf ("SWAP=%s;", swap);
+                    if (fb)
+                        printf ("FB=\"%s\";", fb);
+                }
+            ' $file
+        `
+    done
+fi
+
+# << END initialization <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< #
+
+# >> BEGIN verify prerequisites >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #
+
+$PING localhost -c 5 1>&- 2>&- || {
+    echo >&2 "$MYNAME: error: unable to contact portmapper on localhost."
+    exit 1;
+}
+
+# << END verify prerequisites <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< #
+
+# >> BEGIN main >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #
+
+## >> BEGIN date >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+awk '
+    BEGIN {
+        printf ("%'$offset's %s\n"      \
+            , "DATE:"                   \
+            , "'"`date`"'"         \
+        );
+        exit;
+    }
+'
+
+## << END date <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN login >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+awk '
+    BEGIN {
+        printf ("%'$offset's %s\n"\
+            , "USER:"           \
+            , "'$login'"        \
+        );
+        exit;
+    }
+'
+
+## << END login <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN hostname(s) and IP addresse(s) >>>>>>>>>>>>>>>>>>>>>>>> ##
+
+ifaces=`
+    $NETSTAT -i |
+    awk '
+        NR > 1 && $1 != "lo0" {
+            print $1;
+        }
+    '
+`
+
+for iface in $ifaces
+do
+    ip=`
+        $IFCONFIG $iface 2>&- |
+        awk '
+            $1 == "inet" {
+                print $2;
+            }
+        '
+    `
+
+    [ $ip ] &&
+    case $namesvc in
+        nisplus)
+            /usr/bin/nismatch addr=$ip hosts.org_dir.$domainname
+            ;;
+
+        nis)
+            ypmatch $ip hosts.byaddr 2>&- ||
+            grep -w $ip /etc/hosts
+            ;;
+
+        files)
+            grep -w $ip /etc/hosts
+            ;;
+    esac |
+    awk '
+        {
+            printf ("%'$offset's %s = %s\n"\
+                , "HOSTNAME:"   \
+                , "'"$iface"'"  \
+                , $2            \
+            );
+        }
+
+        END {
+            printf ("%'$offset's %s = %s\n"\
+                , "IP ADDRESS:" \
+                , "'"$iface"'"  \
+                , "'"$ip"'"     \
+            );
+        }
+    '
+done
+
+## << END hostname(s) and IP addresse(s) <<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN model/cpu type >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+if [ "$devinfo" ]
+then
+    echo "$devinfo" |
+    awk '
+        /^Node / {
+            split($0, x, "'\''");
+            if (split (x[2], y, "_") > 1) {
+                model = y[1]"/"y[2];
+            }
+            else {
+                model = y[1];
+            }
+            printf("%'"$offset"'s %s\n"\
+                , "MODEL:"      \
+                , model         \
+            );
+            next;
+        }
+       /^'"$tab"'Node '\''[A-Z][a-zA-Z]*,/ {
+            split($0, x, "'\''");
+            printf("%'"$offset"'s %s\n"\
+                , "CPU:"        \
+                , x[2]          \
+            );
+            next;
+       }
+    '
+else
+    idprom_h=/usr/include/mon/idprom.h
+    [ -f /usr/include/mon/idprom.h ] || idprom_h=-
+
+    echo "
+        /* @(#)idprom.h	1.20 5/22/91 SMI */	
+
+        /*
+         * Copyright (c) 1986,1990 by Sun Microsystems, Inc.
+         */
+
+        #ifndef _mon_idprom_h
+        #define _mon_idprom_h
+
+        #ifndef LOCORE
+        /*
+         * Structure declaration for ID prom in CPU and Ethernet boards
+         */
+
+        struct idprom {
+                unsigned char	id_format;	/* format identifier */
+                /* The following fields are valid only in format IDFORM_1. */
+                unsigned char	id_machine;	/* machine type */
+                unsigned char	id_ether[6];	/* ethernet address */
+                long		id_date;	/* date of manufacture */
+                unsigned	id_serial:24;	/* serial number */
+                unsigned char	id_xsum;	/* xor checksum */
+                unsigned char	id_undef[16];	/* undefined */
+        };
+        #endif LOCORE
+
+        #define IDFORM_1	1	/* Format number for first ID proms */
+
+        /*
+         * The machine type field assignments are constrained such that the
+         * IDM_ARCH_MASK bits define the CPU architecture and the remaining bits
+         * identify the individual implementation of that architecture.
+         */
+        #define	IDM_ARCH_MASK	0xf0	/* mask for architecture bits */
+        #define	IDM_ARCH_SUN2	0x00	/* arch value for Sun-2 */
+        #define	IDM_ARCH_SUN3	0x10	/* arch value for Sun-3 */
+        #define IDM_ARCH_SUN4   0x20    /* arch value for Sun-4 */
+        #define IDM_ARCH_SUN3X	0x40    /* arch value for Sun-3x */
+        #define	IDM_ARCH_SUN4C	0x50	/* arch value for Sun-4c */
+        #define	IDM_ARCH_SUN4M	0x60	/* arch value for Sun-4m */
+
+        /* 
+         * All possible values of the id_machine field (so far): 
+         */
+        #define	IDM_SUN2_MULTI		1	/* Machine type for Multibus CPU brd */
+        #define	IDM_SUN2_VME		2	/* Machine type for VME CPU board    */
+        #define	IDM_SUN3_CARRERA	0x11	/* Carrera CPU	*/
+        #define	IDM_SUN3_M25		0x12	/* M25 CPU	*/
+        #define	IDM_SUN3_SIRIUS		0x13	/* Sirius CPU	*/
+        #define IDM_SUN3_PRISM		0x14    /* Prism CPU	*/
+        #define IDM_SUN3_F		0x17    /* Sun3F CPU	*/
+        #define IDM_SUN3_E		0x18    /* Sun3E CPU	*/
+        #define IDM_SUN4		0x21    /* Sparc CPU	*/
+        #define IDM_SUN4_COBRA		0x22    /* Cobra CPU	*/
+        #define IDM_SUN4_STINGRAY	0x23    /* Stingray CPU	*/
+        #define IDM_SUN4_SUNRAY		0x24	/* Sunray CPU   */
+        #define IDM_SUN3X_PEGASUS	0x41    /* Pegasus CPU	*/
+        #define IDM_SUN3X_HYDRA         0x42    /* Hydra CPU    */
+        #define IDM_SUN4C               0x51    /* Campus CPU   */
+        #define IDM_SUN4C_60		0x51	/* Campus-1 CPU */
+        #define IDM_SUN4C_40		0x52	/* Reserve some names */
+        #define IDM_SUN4C_65		0x53	/* That we might do */
+        #define IDM_SUN4C_20		0x54	/* It might be bigger */
+        #define IDM_SUN4C_75		0x55	/* It might be smaller */
+        #define IDM_SUN4C_30		0x56	/* It might be faster */
+        #define IDM_SUN4C_50		0x57	/* It might be slower */
+        #define IDM_SUN4C_70		0x58	/* It might cost more */
+        #define IDM_SUN4C_80		0x59	/* It might cost less */
+        #define IDM_SUN4C_10		0x5a	/* It might sell well */
+        #define IDM_SUN4C_45		0x5b	/* And then it might not */
+        #define IDM_SUN4C_05		0x5c	/* It might be pink */
+        #define IDM_SUN4C_85		0x5d	/* It might be blue */
+        #define IDM_SUN4C_32		0x5e	/* I certainly don't know */
+        #define IDM_SUN4C_HIKE		0x5f	/* Do you? */
+
+
+        #define IDM_SUN4M_690		0x61	/* SPARCsystem 600 series */
+
+        #endif /*!_mon_idprom_h*/
+    " |
+    awk '
+        BEGIN {
+            mtype  = sprintf ("0x%s", substr ("'"$hostid"'", 1, 2));
+            cpu    = "unknown";
+        }
+
+        $3 == mtype {
+            if (split ($2, x, "_") > 2) {
+                cpu = x[2]"/"x[3];
+            }
+            else {
+                cpu = x[2];
+            }
+            exit;
+        }
+
+        END {
+            printf ("%'"$offset"'s %s\n"\
+                , "MODEL:"      \
+                , cpu           \
+            );
+        }
+    ' $idrpom_h
+fi
+
+## << END model/cpu type <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN frame buffer >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+if [ "$devinfo" ]
+then
+    for fb in `
+        echo "$devinfo" |
+        awk '
+            /Node '\''(bw|cg|gp|gt|taac|vx)(one|two|three|four|five|six|seven|eight|nine)/ {
+                for (i = 1; i <= NF; i++) {
+                    if ($i == "unit") unit = $(i+1);
+                }
+                split($0, x, "'\''");
+                print x[2];
+            }
+        '
+    `
+    do
+        fbs=${fbs:+"$fbs, "}$fb
+    done
+else
+    cd /dev
+    for fb in bw* cg* gp* gt* taac* vx*
+    do
+        [ -c $fb ] && { <$fb; } 2>&- && fbs=${fbs:+"$fbs, "}$fb
+    done
+fi
+
+awk '
+    BEGIN {
+        printf ("%'"$offset"'s %s\n"    \
+            , "FRAME BUFFER(S):"        \
+            , "'"${fbs:-$FB}"'"         \
+        );
+        exit;
+    }
+'
+
+## << END frame buffer <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN OS Release >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+if [ $SVR4 ]
+then
+    awk '
+        BEGIN {
+            printf ("%'"$offset"'s %s\n"    \
+                , "SunOS RELEASE:"          \
+                , "'`uname -r`'"       \
+            );
+            exit;
+        }
+    '
+else
+    /usr/ucb/strings -50 /vmunix 2>&- |
+    awk '
+        BEGIN {
+            if ("'"$RELEASE"'" != "unknown") {
+                printf ("%'"$offset"'s %s\n"\
+                    , "SunOS RELEASE:"  \
+                    , "'"$RELEASE"'"    \
+                );
+                printf ("%'"$offset"'s %s\n"\
+                    , "KERNEL ID:"      \
+                    , "'"$KERNELID"'"   \
+                );
+                exit;
+            }
+        }
+
+        /\) #[1-9]/ {
+            for (i = 1; i <= NF; i++) {
+                if ($i ~ /^\(/) break;
+            }
+            printf ("%'"$offset"'s %s\n"\
+                , "SunOS RELEASE:"      \
+                , $(i-1)                \
+            );
+            printf ("%'"$offset"'s %s\n"            \
+                , "KERNEL ID:"                      \
+                , substr ($i, 2, length ($i) - 2)   \
+            );
+            exit;
+        }
+    '
+fi
+
+## << END OS Release <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN type >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+{
+    DF /
+    DF /usr
+    DF `
+        df $HOME |
+        awk '
+            BEGIN {
+                home = "/home";
+            }
+
+            $NF ~ /^(\/tmp_mnt)*\/home/ {
+                home = "'"$HOME"'";
+            }
+
+            END {
+                print home;
+            }
+        '
+    `
+    $SHOWMOUNT -e 2>&-
+} |
+awk '
+    BEGIN {
+        osserver = homeserver = root = usr = home = "unknown";
+        swap = "'$SWAP'";
+        nfs = "nfs";
+        spec = "spec";
+        if ("'$SVR4'") {
+            ufs = "ufs";
+        }
+        else {
+            ufs = "4.2";
+        }
+        types["server"]         = "server";
+        types[ufs spec ufs ufs] = "standalone";
+        types[ufs spec ufs nfs] = "homeless";
+        types[ufs spec nfs nfs] = "dataless";
+        types[nfs spec nfs nfs] = "swapful";
+        types[nfs nfs  nfs nfs] = "diskless";
+    }
+
+    /^DF \/ / {
+        if (split ($3, x, ":") > 1 && x[1] != "'"$hostname"'") {
+            root = "nfs";
+        }
+        else {
+            root = ufs;
+        }
+        next;
+    }
+
+    /^DF \/usr/ {
+        if (split ($3, x, ":") > 1 && x[1] != "'"$hostname"'") {
+            osserver = x[1];
+            usr = "nfs";
+        }
+        else {
+            usr = ufs;
+        }
+        next;
+    }
+
+    /^DF .*\/home/ {
+        if (split ($3, x, ":") > 1 && x[1] != "'"$hostname"'") {
+            homeserver = x[1];
+            home = "nfs";
+        }
+        else {
+            home = ufs;
+        }
+        next;
+    }
+
+    /^\/export\/exec\// {
+        type = server;
+        exit;
+    }
+
+    END {
+        printf ("%'"$offset"'s ", "TYPE:");
+        if (root == "unknown" || \
+            swap == "unknown" || \
+            usr  == "unknown" || \
+            home == "unknown") {
+            print "unknown (/="root", swap="swap", /usr="usr", /home="home")";
+            if (osserver != "unknown") {
+                printf ("%'"$offset"'s %s\n"\
+                    , "OS FILESERVER:" \
+                    , osserver         \
+                );
+            }
+            if (homeserver != "unknown") {
+                printf ("%'"$offset"'s %s\n"    \
+                    , "HOME FILESERVER:"        \
+                    , homeserver                \
+                );
+            }
+            exit;
+        }
+
+        if (type == "server") {
+            print type;
+        }
+        else if (type = types[root swap usr home]) {
+            print type;
+            if (type == types[ufs spec ufs ufs]) {
+                exit;
+            }
+            else if (type == types[ufs spec ufs nfs]) {
+                printf ("%'"$offset"'s %s\n"\
+                    , "FILESERVER:"     \
+                    , homeserver        \
+                );
+            }
+            else if (osserver == homeserver) {
+                printf ("%'"$offset"'s %s\n"\
+                    , "FILESERVER:"     \
+                    , osserver          \
+                );
+            }
+            else {
+                printf ("%'"$offset"'s %s\n"\
+                    , "OS FILESERVER:"  \
+                    , osserver          \
+                );
+                printf ("%'"$offset"'s %s\n"\
+                    , "HOME FILESERVER:"\
+                    , homeserver        \
+                );
+            }
+        }
+    }
+'
+
+## << END type <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN memory >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+if [ $SVR4 ]
+then
+    echo "$prtconf" |
+    awk '
+        /^Memory size:/ {
+            printf ("%'"$offset"'s %sMB\n"\
+                , "MEMORY:"     \
+                , $3            \
+            );
+            exit;
+        }
+    '
+else
+    awk '
+        BEGIN {
+            printf ("%'"$offset"'s %s\n"\
+                , "MEMORY:"     \
+                , "'"$MEM"'"    \
+            );
+            exit;
+        }
+
+    '
+fi
+
+## << END memory <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN swap >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+{
+    /usr/sbin/swap -s 2>&- ||
+    /etc/pstat -s 2>&-
+} |
+awk '
+    {
+        for (i = 1; i <= NF; i++) {
+            if ($i ~ /used/) break;
+            used = substr ($i, 1, length ($i) - 1);
+            if (used < 10.24) {
+                used_str = $i;
+            }
+            else {
+                used_str = sprintf ("%.1fMB", used / 1024);
+            }
+        }
+
+        for (i = 1; i <= NF; i++) {
+            if ($i ~ /avail/) break;
+            avail = substr ($i, 1, length ($i) - 1);
+            if (avail < 10.24) {
+                avail_str = $i;
+            }
+            else {
+                avail_str = sprintf ("%.1fMB", avail / 1024);
+            }
+        }
+
+        printf ("%'"$offset"'s %.1fMB total, %s used, %s available\n"\
+            , "SWAP:"                   \
+            , (used + avail) / 1024     \
+            , used_str                  \
+            , avail_str                 \
+        );
+    }
+'
+
+## << END swap <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN load average >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+$UPTIME 2>&- |
+awk -F: '
+    {
+        printf ("%'"$offset"'s%s\n"\
+            , "LOAD AVERAGE:"   \
+            , $NF               \
+        );
+        exit;
+    }
+'
+
+## << END load average <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN name service domainname(s) >>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+dns_domain=`
+    {
+        awk '/^domain/ {print $2; exit;}' /etc/resolv.conf 2>&- ||
+        ypmatch $hostname. hosts 2>&- ||
+        ypmatch $hostname\`
+            expr \\\`domainname\\\` : '[^.]*\(.*\)'
+        \` hosts 2>&-
+    } |
+    awk '
+        {
+            for (i = 2; i < split ($2, x, "."); i++) {
+                domain = domain x[i] ".";
+            }
+            domain = domain x[i];
+            print domain;
+            exit;
+        }
+    '
+`
+
+if [ $dns_domain ]
+then
+    awk '
+        BEGIN {
+            printf ("%'"$offset"'s %s\n"\
+                , "DNS DOMAINNAME:"     \
+                , "'"$dns_domain"'"     \
+            );
+            exit;
+        }
+    '
+fi
+
+case $namesvc in
+    files)
+        ;;
+
+    *)
+        if [ $nisplus ]
+        then
+            awk '
+                BEGIN {
+                    printf ("%'"$offset"'s %s\n"\
+                        , "NIS+ DOMAINNAME:"    \
+                        , "'"$domainname"'"     \
+                    );
+                    exit;
+                }
+            '
+        fi
+        if [ $nis ]
+        then
+            awk '
+                BEGIN {
+                    printf ("%'"$offset"'s %s\n"\
+                        , "NIS DOMAINNAME:"     \
+                        , "'"$domainname"'"     \
+                    );
+                    exit;
+                }
+            '
+        fi
+        ;;
+esac
+
+## << END name service domainname(s) <<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN software server(s) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+{
+    echo $PATH |
+    tr : '\012'
+    DF /usr/dist
+    DF /usr/sds
+    DF /usr/local
+} |
+awk '
+    $1 == "DF" {
+        for (i = 1; i <= t; i++) {
+            if ($2 == type[i] && split ($3, x, ":") > 1) {
+                softserv[type[i]] = x[1];
+                s++;
+                break;
+            }
+        }
+        next;
+    }
+
+    /^\/usr\/(((dist|sds)\/exe)|local(\/bin)*)$/ {
+        split ($0, x, "/");
+        if (y["/usr/" x[3]]++ < 1) type[++t] = "/usr/" x[3];
+    }
+
+    END {
+        if (s) {
+            first = 1;
+            printf ("%'"$offset"'s"     \
+                , "SOFTWARE SERVER(S):" \
+            );
+            for (i = 1; i <= t; i++) {
+                if (softserv[type[i]]) {
+                    if (first) {
+                        printf (" %s", softserv[type[i]]);
+                        first = 0;
+                    }
+                    else {
+                        if (softserv[type[i]] != softserv[type[1]])
+                            printf (", %s", softserv[type[i]]);
+                    }
+                }
+            }
+            printf ("\n");
+        }
+    }
+' -
+
+## << END software server(s) <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN default printer >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+PRINTER=${PRINTER:-`
+    awk '
+        BEGIN {
+            l = 0;
+        }
+
+        /\\$/ {
+            line[l] = line[l] substr ($0, 1, length ($0) - 1);
+            next;
+        }
+
+        {
+            line[l] = line[l++] $0;
+        }
+
+        END {
+            for (i = 0; i < l; i++) {
+                if (line[i] ~ /^#/) continue;
+                if (line[i] ~ /^lp[|:]|\|lp[|:]/) {
+                    for (j = 1; j <= split (line[i], x, ":"); j++) {
+                        if (j == 1) {
+                            split (x[j], names, "|");
+                            continue;
+                        }
+                        if (split (x[j], y, "=")) {
+                            if (y[1] == "rp") {
+                                print y[2];
+                                exit;
+                            }
+                        }
+                        for (k in names) {
+                            if (names[k] \
+                                ~ /^([0-9]|lp|lw|im|[Ii]magen|ps|[Pp]ost[Ss]cript)[0-9]*$/)
+                                continue;
+                            print names[k];
+                            exit;
+                        }
+                        print names[1];
+                        exit;
+                    }
+                    exit;
+                }
+            }
+            print "none";
+        }
+    ' /etc/printcap 2>&- ||
+    cat /etc/lp/default 2>&-
+`}
+
+awk '
+    BEGIN {
+        printf ("%'"$offset"'s %s\n"    \
+            , "DEFAULT PRINTER:"        \
+            , "'"${PRINTER:-none}"'"    \
+        );
+        exit;
+    }
+'
+
+## << END default printer <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN ethernet address >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+$PING -v $hostname 2>&- 1>&-
+$ARP $hostname 2>&- |
+awk '
+    BEGIN {
+        ether = "'"$ETHER"'";
+    }
+
+    / at / {
+        ether = $4;
+        exit;
+    }
+
+    END {
+        printf ("%'"$offset"'s %s\n"\
+            , "ETHERNET ADDRESS:"   \
+            , ether                 \
+        );
+    }
+'
+
+## << END ethernet address <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN hostid >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+awk '
+    BEGIN {
+        printf ("%'"$offset"'s %s\n"\
+            , "HOSTID:"         \
+            , "'$hostid'"       \
+        );
+        exit;
+    }
+'
+
+## << END hostid <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN disks >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+if [ $SVR4 ]
+then
+    mnttab=/etc/mnttab
+else
+    mnttab=/etc/mtab
+fi
+
+if [ -f /etc/format.dat ]
+then
+    format_dat=/etc/format.dat
+else
+    format_dat=/tmp/format.dat$$
+    trap "rm -f $format_dat; exit" 0 1 2 3 15
+    sed -e 's/^        //' << '    endsed' > $format_dat
+        #
+        #ident	"@(#)format.dat	1.3	90/10/18 SMI"
+        #
+        # Copyright (c) 1991 by Sun Microsystems, Inc.
+        #
+        # Data file for the 'format' program.  This file defines the known
+        # disks, disk types, and partition maps.
+        #
+
+        #
+        # This is the search path for 'format'. It contains all the disks that
+        # will be searched for if no disk list is given on the command line.
+        #
+        search_path =	xd0, xd1, xd2, xd3, xd4, xd5, xd6, xd7, xd8, xd9, xd10, xd11, \
+                        xd12, xd13, xd14, xd15, xy[0-3], sd[0-7], sd8, sd9, sd10, \
+                        sd11, sd12, sd13, sd14, sd15, id0[0-3][0-7]
+
+        #
+        # This is the list of supported disks for the Xylogics 450/451 controller.
+        #
+        disk_type = "Fujitsu-M2312K" \
+                : ctlr = XY450 : fmt_time = 4 \
+                : ncyl = 587 : acyl = 2 : pcyl = 589 : nhead = 7 : nsect = 32 \
+                : rpm = 3600 : bpt = 20480 : bps = 621 : drive_type = 1
+
+        disk_type = "Fujitsu-M2284/M2322" \
+                : ctlr = XY450 : fmt_time = 4 \
+                : ncyl = 821 : acyl = 2 : pcyl = 823 : nhead = 10 : nsect = 32 \
+                : rpm = 3600 : bpt = 20480 : bps = 621 : drive_type = 2
+
+        disk_type = "Fujitsu-M2351 Eagle" \
+                : ctlr = XY450 : fmt_time = 4 \
+                : ncyl = 840 : acyl = 2 : pcyl = 842 : nhead = 20 : nsect = 46 \
+                : rpm = 3961 : bpt = 28160 : bps = 595 : drive_type = 0
+
+        disk_type = "Fujitsu-M2333" \
+                : ctlr = XY450 : fmt_time = 4 \
+                : ncyl = 821 : acyl = 2 : pcyl = 823 : nhead = 10 : nsect = 67 \
+                : rpm = 3600 : bpt = 40960 : bps = 600 : drive_type = 3
+
+        disk_type = "Fujitsu-M2361 Eagle" \
+                : ctlr = XY450 : fmt_time = 4 \
+                : ncyl = 840 : acyl = 2 : pcyl = 842 : nhead = 20 : nsect = 67 \
+                : rpm = 3600 : bpt = 40960 : bps = 600 : drive_type = 3
+
+        disk_type = "CDC EMD 9720" \
+                : ctlr = XY450 : fmt_time = 4 \
+                : ncyl = 1147 : acyl = 2 : pcyl = 1217 : nhead = 10 : nsect = 48 \
+                : rpm = 3600 : bpt = 30240 : bps = 613 : drive_type = 1
+
+        disk_type = "Hitachi DK815-10" \
+                : ctlr = XY450 : fmt_time = 4 \
+                : ncyl = 1735 : acyl = 2 : pcyl = 1737 : nhead = 15 : nsect = 67 \
+                : rpm = 3600 : bpt = 40960 : bps = 600 : drive_type = 1
+
+        disk_type = "NEC D2363" \
+                : ctlr = XY450 : fmt_time = 4 \
+                : ncyl = 964 : acyl = 2 : pcyl = 1024 : nhead = 27 : nsect = 67 \
+                : rpm = 3600 : bpt = 40960 : bps = 600 : drive_type = 2
+
+        #
+        # This is the list of supported disks for the Xylogics 7053 controller.
+        #
+        disk_type = "Fujitsu-M2351 Eagle" \
+                : ctlr = XD7053 \
+                : ncyl = 840 : acyl = 2 : pcyl = 842 : nhead = 20 : nsect = 46 \
+                : rpm = 3961 : bpt = 28160 : bps = 595
+
+        disk_type = "Fujitsu-M2333" \
+                : ctlr = XD7053 \
+                : ncyl = 821 : acyl = 2 : pcyl = 823 : nhead = 10 : nsect = 67 \
+                : rpm = 3600 : bpt = 40960 : bps = 600
+
+        disk_type = "Fujitsu-M2361 Eagle" \
+                : ctlr = XD7053 \
+                : ncyl = 840 : acyl = 2 : pcyl = 842 : nhead = 20 : nsect = 67 \
+                : rpm = 3600 : bpt = 40960 : bps = 600
+
+        disk_type = "CDC EMD 9720" \
+                : ctlr = XD7053 \
+                : ncyl = 1147 : acyl = 2 : pcyl = 1217 : nhead = 10 : nsect = 48 \
+                : rpm = 3600 : bpt = 30240 : bps = 613
+
+        disk_type = "Hitachi DK815-10" \
+                : ctlr = XD7053 \
+                : ncyl = 1735 : acyl = 2 : pcyl = 1737 : nhead = 15 : nsect = 67 \
+                : rpm = 3600 : bpt = 40960 : bps = 600
+
+        disk_type = "NEC D2363" \
+                : ctlr = XD7053 \
+                : ncyl = 964 : acyl = 2 : pcyl = 1024 : nhead = 27 : nsect = 67 \
+                : rpm = 3600 : bpt = 40960 : bps = 600
+
+        disk_type = "Fujitsu-M2372K" \
+                : ctlr = XD7053 \
+                : ncyl = 743 : acyl = 2 : pcyl = 745 : nhead = 27 : nsect = 67 \
+                : rpm = 3600 : bpt = 40960 : bps = 600
+
+        disk_type = "CDC 9720-850" \
+                : ctlr = XD7053 \
+                : ncyl = 1358 : acyl = 2 : pcyl = 1360 : nhead = 15 : nsect = 66 \
+                : rpm = 3600 : bpt = 41088 : bps = 610
+
+        #
+        # This is the list of supported disks for the Emulex MD21 controller.
+        #
+        disk_type = "Micropolis 1355" \
+                : ctlr = MD21 \
+                : ncyl = 1018 : acyl = 2 : pcyl = 1024 : nhead = 8 : nsect = 34 \
+                : rpm = 3600 : bpt = 20832
+
+        disk_type = "Toshiba MK 156F" \
+                : ctlr = MD21 \
+                : ncyl = 815 : acyl = 2 : pcyl = 830 : nhead = 10 : nsect = 34 \
+                : rpm = 3600 : bpt = 20832
+
+        disk_type = "Micropolis 1558" \
+                : ctlr = MD21 \
+                : ncyl = 1218 : acyl = 2 : pcyl = 1224 : nhead = 15 : nsect = 35 \
+                : rpm = 3600 : bpt = 20833
+
+        #
+        # This is the list of supported disks for the ISP-80 IPI controller.
+        #
+        disk_type = "CDC IPI 9720" \
+                : ctlr = "ISP-80" \
+                : ncyl = 1631 : acyl = 1 : pcyl = 1633 : nhead = 15 : nsect = 82 \
+                : rpm = 3600 : bpt = 50400
+
+        disk_type = "CDC IPI 9722" \
+                : ctlr = "ISP-80" \
+                : ncyl = 1630 : acyl = 1 : pcyl = 1632 : nhead = 7 : nsect = 156 \
+                : rpm = 3600 : bpt = 100800
+
+        disk_type = "Seagate IPI ZBR Elite" \
+                : ctlr = "ISP-80" \
+                : ncyl = 1893 : acyl = 1 : pcyl = 1895 : nhead = 17 : nsect = 78 \
+                : rpm = 5400 : bpt = 50400
+
+        #
+        # Following is a list of sample embedded SCSI disk configurations.
+        #
+        disk_type = "Quantum ProDrive 80S" \
+                : ctlr = SCSI : fmt_time = 1 \
+                : cache = 0x07 : trks_zone = 6 : atrks = 0 : asect = 1 \
+                : ncyl = 832 : acyl = 2 : pcyl = 834 : nhead = 6 : nsect = 34 \
+                : rpm = 3662 : bpt = 16896
+
+        #disk_type = "CDC Wren VII 94601-12G" \
+        #	: ctlr = SCSI : fmt_time = 4 \
+        #	: cache = 0x11 : trks_zone = 15 : asect = 5 : atrks = 30 \
+        #	: ncyl =  1703 : acyl = 2 : pcyl = 1931 : nhead = 15 : nsect = 80 \
+        #	: rpm = 3597 : bpt = 41301
+
+        #
+        # An early CDC Wren IV, shipped with the 386i
+        #
+        #disk_type = "CDC Wren IV 94171-327" \
+        #	: ctlr = SCSI : fmt_time = 4 \
+        #	: cache = 0x11 : trks_zone = 9 : asect = 3 \
+        #	: ncyl = 1520 : acyl = 2 : pcyl = 1549 : nhead = 9 : nsect = 46 \
+        #	: rpm = 3600 : bpt = 20833
+
+        #
+        # This is the list of Sun supported disks for embedded SCSI.
+        #
+        disk_type = "Quantum ProDrive 105S" \
+                : ctlr = SCSI : fmt_time = 1 \
+                : cache = 0x07 : trks_zone = 6 : atrks = 0 : asect = 1 \
+                : ncyl = 974 : acyl = 2 : pcyl = 1019 : nhead = 6 : nsect = 35 \
+                : rpm = 3662 : bpt = 16896
+
+        disk_type = "CDC Wren IV 94171-344" \
+                : ctlr = SCSI : fmt_time = 4 \
+                : cache = 0x11 : trks_zone = 9 : asect = 3 \
+                : ncyl = 1545 : acyl = 2 : pcyl = 1549 : nhead = 9 : nsect = 46 \
+                : rpm = 3600 : bpt = 20833
+
+        disk_type = "SUN0104" \
+                : ctlr = SCSI : fmt_time = 1 \
+                : trks_zone = 6 : atrks = 0 : asect = 1 \
+                : ncyl = 974 : acyl = 2 : pcyl = 1019 : nhead = 6 : nsect = 35 \
+                : rpm = 3662 : bpt = 16896
+
+        disk_type = "SUN0207" \
+                : ctlr = SCSI \
+                : trks_zone = 9 : atrks = 2: asect = 4 \
+                : ncyl = 1254 : acyl = 2 : pcyl = 1272 : nhead = 9 : nsect = 36 \
+                : rpm = 3600 : bpt = 18432
+
+        disk_type = "SUN0327" \
+                : ctlr = SCSI : fmt_time = 4 \
+                : cache = 0x11 : trks_zone = 9 : asect = 3 \
+                : ncyl = 1545 : acyl = 2 : pcyl = 1549 : nhead = 9 : nsect = 46 \
+                : rpm = 3600 : bpt = 20833
+
+        disk_type = "SUN0424" \
+                : ctlr = SCSI : fmt_time = 4 \
+                : trks_zone = 9 : asect = 2 \
+                : ncyl = 1151 : acyl = 2 : pcyl = 2500 : nhead = 9 : nsect = 80 \
+                : rpm = 4400 : bpt = 26000
+
+        disk_type = "SUN0669" \
+                : ctlr = SCSI : fmt_time = 4 \
+                : trks_zone = 15 : asect = 5 : atrks = 30 \
+                : ncyl =  1614 : acyl = 2 : pcyl = 1632 : nhead = 15 : nsect = 54 \
+                : rpm = 3600 : bpt = 31410
+
+        disk_type = "SUN1.0G" \
+                : ctlr = SCSI : fmt_time = 4 \
+                : trks_zone = 15 : asect = 5 : atrks = 30 \
+                : ncyl =  1703 : acyl = 2 : pcyl = 1931 : nhead = 15 : nsect = 80 \
+                : rpm = 3597 : bpt = 41301
+
+        disk_type = "SUN1.3G" \
+                : ctlr = SCSI : fmt_time = 4 \
+                : trks_zone = 17 : asect = 6 : atrks = 17 \
+                : ncyl = 1965 : acyl = 2 : pcyl = 3500 : nhead = 17 : nsect = 80 \
+                : rpm = 5400 : bpt = 44823
+
+        disk_type = "SUN2.1G" \
+                : ctlr = SCSI : fmt_time = 4 \
+                : ncyl = 2733 : acyl = 2 : pcyl = 3500 : nhead = 19 : nsect = 80 \
+                : rpm = 5400 : bpt = 44823
+
+
+        #
+        # This is the list of partition tables for the Xylogics 450/451 controller.
+        #
+        partition = "Fujitsu-M2312K" \
+                : disk = "Fujitsu-M2312K" : ctlr = XY450 \
+                : 0 = 0, 15904 : 1 = 71, 33600 : 2 = 0, 131488 : 6 = 221, 81984
+
+        partition = "Fujitsu-M2312K Old Type" \
+                : disk = "Fujitsu-M2312K" : ctlr = XY450 \
+                : 0 = 0, 15884 : 1 = 71, 33440 : 2 = 0, 131488 : 6 = 221, 81984
+
+        partition = "Fujitsu-M2284/M2322" \
+                : disk = "Fujitsu-M2284/M2322" : ctlr = XY450 \
+                : 0 = 0, 16000 : 1 = 50, 33600 : 2 = 0, 262720 : 6 = 155, 213120
+
+        partition = "Fujitsu-M2284/M2322 Old Type" \
+                : disk = "Fujitsu-M2284/M2322" : ctlr = XY450 \
+                : 0 = 0, 15884 : 1 = 50, 33440 : 2 = 0, 262720 : 6 = 155, 213120
+
+        partition = "Fujitsu-M2351 Eagle" \
+                : disk = "Fujitsu-M2351 Eagle" : ctlr = XY450 \
+                : 0 = 0, 16560 : 1 = 18, 34040 : 2 = 0, 772800 : 6 = 55, 722200
+
+        partition = "Fujitsu-M2351 Eagle Old Type" \
+                : disk = "Fujitsu-M2351 Eagle" : ctlr = XY450 \
+                : 0 = 0, 15884 : 1 = 18, 33440 : 2 = 0, 772800 : 6 = 55, 722200
+
+        partition = "Fujitsu-M2333" \
+                : disk = "Fujitsu-M2333" : ctlr = XY450 \
+                : 0 = 0, 16080 : 1 = 24, 33500 : 2 = 0, 550070 : 6 = 74, 500490
+
+        partition = "Fujitsu-M2361 Eagle" \
+                : disk = "Fujitsu-M2361 Eagle" : ctlr = XY450 \
+                : 0 = 0, 16080 : 1 = 12, 33500 : 2 = 0, 1125600 : 6 = 37, 1076020
+
+        partition = "CDC EMD 9720" \
+                : disk = "CDC EMD 9720" : ctlr = XY450 \
+                : 0 = 0, 16320 : 1 = 34, 33600 : 2 = 0, 550560 : 6 = 104, 500640
+
+        partition = "Hitachi DK815-10" \
+                : disk = "Hitachi DK815-10" : ctlr = XY450 \
+                : 0 = 0, 32160 : 1 = 32, 67335 : 2 = 0, 1743675 : 6 = 99, 1644180
+
+        partition = "NEC D2363" \
+                : disk = "NEC D2363" : ctlr = XY450 \
+                : 0 = 0, 32562 : 1 = 18, 66933 : 2 = 0, 1743876 : 6 = 55, 1644381
+
+        #
+        # This is the list of partition tables for the Xylogics 7053 controller.
+        #
+        partition = "Fujitsu-M2351 Eagle" \
+                : disk = "Fujitsu-M2351 Eagle" : ctlr = XD7053 \
+                : 0 = 0, 16560 : 1 = 18, 34040 : 2 = 0, 772800 : 6 = 55, 722200
+
+        partition = "Fujitsu-M2351 Eagle Old Type" \
+                : disk = "Fujitsu-M2351 Eagle" : ctlr = XD7053 \
+                : 0 = 0, 15884 : 1 = 18, 33440 : 2 = 0, 772800 : 6 = 55, 722200
+
+        partition = "Fujitsu-M2333" \
+                : disk = "Fujitsu-M2333" : ctlr = XD7053 \
+                : 0 = 0, 16080 : 1 = 24, 33500 : 2 = 0, 550070 : 6 = 74, 500490
+
+        partition = "Fujitsu-M2361 Eagle" \
+                : disk = "Fujitsu-M2361 Eagle" : ctlr = XD7053 \
+                : 0 = 0, 16080 : 1 = 12, 33500 : 2 = 0, 1125600 : 6 = 37, 1076020
+
+        partition = "CDC EMD 9720" \
+                : disk = "CDC EMD 9720" : ctlr = XD7053 \
+                : 0 = 0, 16320 : 1 = 34, 33600 : 2 = 0, 550560 : 6 = 104, 500640
+
+        partition = "Hitachi DK815-10" \
+                : disk = "Hitachi DK815-10" : ctlr = XD7053 \
+                : 0 = 0, 32160 : 1 = 32, 67335 : 2 = 0, 1743675 : 6 = 99, 1644180
+
+        partition = "NEC D2363" \
+                : disk = "NEC D2363" : ctlr = XD7053 \
+                : 0 = 0, 32562 : 1 = 18, 66933 : 2 = 0, 1743876 : 6 = 55, 1644381
+
+        partition = "Fujitsu-M2372K" \
+                : disk = "Fujitsu-M2372K" : ctlr = XD7053 \
+                : 0 = 0, 32562 : 1 = 18, 66933 : 2 = 0, 1344087: 6 = 55,1244592
+
+        partition = "CDC 9720-850" \
+                : disk = "CDC 9720-850" : ctlr = XD7053 \
+                : 0 = 0, 32670 : 1 = 33, 67320: 2 = 0, 1344420: 6 = 101, 1244430
+
+        #
+        # This is the list of partition tables for the Emulex MD21 controller.
+        #
+        partition = "Micropolis 1355" \
+                : disk = "Micropolis 1355" : ctlr = MD21 \
+                : 0 = 0, 16048 : 1 = 59, 33456 : 2 = 0, 276896 : 6 = 182, 227392
+
+        partition = "Micropolis 1355, large root" \
+                : disk = "Micropolis 1355" : ctlr = MD21 \
+                : 0 = 0, 31824 : 1 = 117, 59840 : 2 = 0, 276896 : 6 = 337, 185232
+
+        partition = "Toshiba MK 156F" \
+                : disk = "Toshiba MK 156F" : ctlr = MD21 \
+                : 0 = 0, 15980 : 1 = 47, 33660 : 2 = 0, 277100 : 6 = 146, 227460
+
+        partition = "Micropolis 1558, small root" \
+                : disk = "Micropolis 1558" : ctlr = MD21 \
+                : 0 = 0, 16275 : 1 = 31, 32550 : 2 = 0, 639450 : 6 = 93, 590625
+
+        partition = "Micropolis 1558" \
+                : disk = "Micropolis 1558" : ctlr = MD21 \
+                : 0 = 0, 32025 : 1 = 61, 59850 : 2 = 0, 639450 : 6 = 175, 547575
+
+        #
+        # Following is a list of sample partition tables for embedded SCSI disks.
+        #
+        partition = "Quantum ProDrive 80S" \
+                : disk = "Quantum ProDrive 80S" : ctlr = SCSI \
+                : 0 = 0, 16384 : 1 = 64, 32512 : 2 = 0, 198144 : 6 = 191, 149248
+
+        #partition = "CDC Wren VII 94601-12G" \
+        #	: disk = "CDC Wren VII 94601-12G" : ctlr = SCSI \
+        #	: 0 = 0, 32400 : 1 = 27, 64800 : 2 = 0, 2043600 : 6 = 81, 1946400
+
+        #partition = "CDC Wren IV 94171-327" \
+        #	: disk = "CDC Wren IV 94171-327" : ctlr = SCSI \
+        #	: 0 = 0, 31878 : 1 = 77, 59616 : 2 = 0, 629280 : 6 = 221, 527786
+
+        #
+        # This is the list of partition tables for embedded SCSI controllers.
+        #
+        partition = "Quantum ProDrive 105S" \
+                : disk = "Quantum ProDrive 105S" : ctlr = SCSI \
+                : 0 = 0, 16170 : 1 = 77, 28140 : 2 = 0, 204540 : 6 = 211, 160230
+
+        partition = "CDC Wren IV 94171-344, small root" \
+                : disk = "CDC Wren IV 94171-344" : ctlr = SCSI \
+                : 0 = 0, 16974 : 1 = 41, 33948 : 2 = 0, 639630 : 6 = 123, 588708
+
+        partition = "CDC Wren IV 94171-344" \
+                : disk = "CDC Wren IV 94171-344" : ctlr = SCSI \
+                : 0 = 0, 31878 : 1 = 77, 59616 : 2 = 0, 639630 : 6 = 221, 548136
+
+        partition = "SUN0104" \
+                : disk = "SUN0104" : ctlr = SCSI \
+                : 0 = 0, 16170 : 1 = 77, 28140 : 2 = 0, 204540 : 6 = 211, 160230
+
+        partition = "SUN0207" \
+                : disk = "SUN0207" : ctlr = SCSI \
+                : 0 = 0, 16524 : 1 = 51, 65448 : 2 = 0, 406296 : 6 = 253, 324324
+
+        partition = "SUN0327" \
+                : disk = "SUN0327" : ctlr = SCSI \
+                : 0 = 0, 31878 : 1 = 77, 59616 : 2 = 0, 639630 : 6 = 221, 548136
+
+        partition = "SUN0424" \
+                : disk = "SUN0424" : ctlr = SCSI \
+                : 0 = 0, 33120 : 1 = 46, 65520 : 2 = 0, 828720 : 6 = 137, 730080
+
+        partition = "SUN0669" \
+                : disk = "SUN0669" : ctlr = SCSI \
+                : 0 = 0, 32400 : 1 = 40, 64800 : 2 = 0, 1307340 : 6 = 120, 1210140
+
+        partition = "SUN1.0G" \
+                : disk = "SUN1.0G" : ctlr = SCSI \
+                : 0 = 0, 32400 : 1 = 27, 64800 : 2 = 0, 2043600 : 6 = 81, 1946400
+
+        partition = "SUN1.3G" \
+                : disk = "SUN1.3G" : ctlr = SCSI \
+                : 0 = 0, 34000 : 1 = 25, 133280 : 2 = 0, 2672400 : 6 = 123, 2505120
+
+        partition = "SUN2.1G" \
+                : disk = "SUN2.1G" : ctlr = SCSI \
+                : 0 = 0, 62320 : 1 = 41, 197600 : 2 = 0, 4154160 : 6 = 171, 3894240
+
+        #
+        # This is the list of sample partition tables for IPI disks.
+        #
+        partition = "CDC IPI 9720" \
+                : disk = "CDC IPI 9720" : ctlr = ISP-80 \
+                : 0 = 0, 33210 : 1 = 27, 131610 : 2 = 0, 2006130 : 6 = 134, 196800 \
+                : 7 = 294, 1644510
+
+        partition = "CDC IPI 9722" \
+                : disk = "CDC IPI 9722" : ctlr = ISP-80 \
+                : 0 = 0, 33852 : 1 = 31, 132132 : 2 = 0, 1779960 : 6 = 152, 197652 \
+                : 7 = 333, 1416324
+
+        partition = "Seagate IPI ZBR Elite" \
+                : disk = "Seagate IPI ZBR Elite" : ctlr = ISP-80 \
+                : 0 = 0, 34476 : 1 = 26, 132600 : 2 = 0, 2510118 : 6 = 126, 663000 \
+                : 7 = 626, 1680042
+    endsed
+fi
+
+{
+    /usr/etc/metastat
+    if [ $SVR4 ]
+    then
+        /usr/sbin/prtvtoc /dev/rdsk/*s2 2>&-
+        /usr/bin/df -F ufs -k 2>&-
+    else
+        for disk in `
+            awk '
+                BEGIN {
+                    l = 0;
+                }
+
+                /\\\\$/ {
+                    line[l] = line[l] substr($0, 1, length($0) - 1);
+                    next;
+                }
+
+                {
+                    line[l] = line[l++] $0;
+                    if (line[l - 1] ~ /^[ ]*search_path/) {
+                        exit;
+                    }
+                }
+
+                END {
+                    for (i = 0; i < l; i++) {
+                        if (line[i] ~ /^[ ]*search_path/) {
+                            split (line[i], a, "=");
+                            for (j = 1; j <= split(a[2], b, ","); j++) {
+                                if (n = split(c[split(b[j], c)], d, "[") == 1) {
+                                    print d[1];
+                                }
+                                else {
+                                    if (n == 2) {
+                                        for (k = substr(d[2], 1, 1); k <= substr(d[2], 3, 1); k++) {
+                                            print d[1] k;
+                                        }
+                                    }
+                                    else {
+                                        for (k = substr(d[2], 1, 1); k <= substr(d[2], 3, 1); k++) {
+                                            for (l = substr(d[3], 1, 1); l <= substr(d[3], 3, 1); l++) {
+                                                    print d[1] k l;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            exit;
+                        }
+                    }
+                }
+            ' $format_dat
+        `
+        do
+            if [ -r /dev/${disk}c ]
+            then
+                { </dev/${disk}c && /etc/dkinfo $disk; } 2>&-
+            else
+                /etc/dkinfo $disk 2>&-
+            fi
+        done
+        df 2>&-
+    fi
+} 2>&- |
+awk '
+    BEGIN {
+        l = 0;
+    }
+
+    FILENAME ~ /format.dat/ && /\\$/ {
+        line[l] = line[l] substr($0, 1, length($0) - 1);
+        next;
+    }
+
+    FILENAME ~ /format.dat/ {
+        line[l] = line[l++] $0;
+        next;
+    }
+
+    FILENAME == "'$mnttab'" && /^\/dev\/md\/dsk\// {
+        metadisk++;
+        metaparts[(disk = substr($1, 13, 2)) ++mnt[disk]] = \
+            " mounted on "$2;
+        sliceof[disk mnt[disk]] = disk;
+        next;
+    }
+
+    FILENAME == "'$mnttab'" && /^\/dev\/dsk\// {
+        parts[(disk = substr($1, 10, 6)) ++mnt[disk]] = \
+            (s = substr($1, 16, 2))" mounted on "$2;
+        sliceof[disk mnt[disk]] = disk s;
+        next;
+    }
+
+    FILENAME == "'$mnttab'" && /^\/dev\/md/ {
+        metadisk++;
+        metaparts[(disk = substr($1, 6, length($1) - 6)) ++mnt[disk]] = \
+            (s = substr($1, length($1), 1))" mounted on "$2;
+        sliceof[disk mnt[disk]] = disk s;
+        next;
+    }
+
+    FILENAME == "'$mnttab'" && /^\/dev\// {
+        parts[(disk = substr($1, 6, length($1) - 6)) ++mnt[disk]] = \
+            (s = substr($1, length($1), 1))" mounted on "$2;
+        sliceof[disk mnt[disk]] = disk s;
+        next;
+    }
+
+    /partition map/ {
+        prtvtoc = 1; df = dkinfo = metastat 0;
+        disk = substr(x[split($2, x, "/")], 1, 6);
+        dk[++dki] = disk;
+        ndisks++;
+        next;
+    }
+
+    /^[Ff]ilesystem/ {
+        df = 1; dkinfo = metastat = prtvtoc = 0;
+        next;
+    }
+
+    prtvtoc == 1 {
+        if ($NF == "bytes/sector") {
+            bytes = $2;
+            next;
+        }
+        if ($NF == "cylinders") {
+            cylinders = $2;
+            next;
+        }
+        if ($NF == "tracks/cylinder") {
+            heads = $2;
+            next;
+        }
+        if ($NF == "sectors/track") {
+            sectors = $2;
+            next;
+        }
+        if ($2 == "Partition") {
+            disks[disk] = sprintf("%05d%05d%05d", cylinders, heads, sectors)
+            size[disk] = int(cylinders * heads * sectors * bytes / 1000000);
+            next;
+        }
+        if ($1 ~ /^[0-9]$/ && $3 == "01") {
+            mnt[disk]++;
+            parts[disk mnt[disk]] = $1;
+            sliceof[disk mnt[disk]] = disk"s"$1;
+            swap[sliceof[disk mnt[disk]]]++;
+            size[sliceof[disk mnt[disk]]] = int($5 / (4 * bytes));
+        }
+        next;
+    }
+
+    df == 1 && /^\/dev\/md\/dsk\// {
+        size[(slice = substr($1, 13, 2))] = int(($3 + $4) / 1024);
+        cap[slice] = $5;
+        next;
+    }
+
+    df == 1 && /\/dev\/dsk\// {
+        size[(slice = substr($1, 10, 8))] = int(($3 + $4) / 1024);
+        cap[slice] = $5;
+        next;
+    }
+
+    df == 1 && /\/dev\// {
+        size[(part = substr($1, 6, 8))] = int(($3 + $4) / 1024);
+        cap[part] = $5;
+        next;
+    }
+
+    /controller/ {
+        dkinfo = 1; df = metastat = prtvtoc = 0;
+        disk = substr($1, 1, index($1, ":") - 1);
+        dk[++dki] = disk;
+        getline;
+        disks[disk] = sprintf("%05d%05d%05d", $1, $3, $5)
+        size[disk] = int($1 * $3 * $5 * 512 / 1000000);
+        ndisks++;
+        next;
+    }
+
+    /^md[0-9][0-9]*:/ {
+        metastat = 1; df = dkinfo = prtvtoc = 0;
+        split($1, x, ":")
+        mountp = substr(x[1], 2);
+        next;
+    }
+
+    /^\/dev\/md[0-9][a-h]:/ {
+        metastat = 1; df = dkinfo = prtvtoc = 0;
+        mountp = substr(x[split($1, x, "/")], 1, 4);
+        next;
+    }
+
+    metastat == 1 && /\/dev/ {
+        disksuite[part = substr(x[split($1, x, "/")], 1, 9)] = mountp;
+        mpart[++mmnt[disk = substr(part, 1, length(part) - 1)] disk] = part;
+        next;
+    }
+
+    END {
+        if (!ndisks) {
+            exit;
+        }
+        for (i = 0; i < l; i++) {
+            if (line[i] ~ /^disk_type/) {
+                n = split(line[i], a);
+                line[i] = "";
+                for (j = 1; j <= n; j++) {
+                    line[i] = line[i] a[j];
+                }
+                for (j = 1; j <= split(line[i], a, ":"); j++) {
+                    split(a[j], b, "=");
+                    if (b[1] == "disk_type") {
+                        type = b[2];
+                    }
+                    else if (b[1] == "ncyl") {
+                        ncyl = b[2];
+                    }
+                    else if (b[1] == "nhead") {
+                        nhead = b[2];
+                    }
+                    else if (b[1] == "nsect") {
+                        nsect = b[2];
+                    }
+                }
+                table[sprintf("%05d%05d%05d", ncyl, nhead, nsect)] = type;
+            }
+        }
+        if (metadisk) {
+            for (part in metaparts) {
+                disk = substr(part, 1, length(part) - 1);
+                if (disk ~ /^d[1-9]/) {
+                    slice = disk;
+                }
+                else {
+                    slice = disk substr(metaparts[part], 1, 1);
+                }
+                printf ("%'"$offset"'s %s%s (%sMB, %s full)\n"\
+                    , "METAPARTITION:"  \
+                    , disk              \
+                    , metaparts[part]   \
+                    , size[slice]       \
+                    , cap[slice]        \
+                );
+            }
+        }
+        for (j = 1; j <= dki; j++) {
+            if (size[dk[j]]) {
+                printf ("%'"$offset"'s %s "\
+                    , "DISK:"   \
+                    , dk[j]     \
+                );
+                if (length(table[disks[dk[j]]])) {
+                    print table[disks[dk[j]]], "(" size[dk[j]] "MB unformatted)";
+                }
+                else {
+                    print "unknown", "(" size[dk[j]] "MB unformatted)";
+                }
+            }
+            else {
+                printf ("%'"$offset"'s %s\n"\
+                    , "CDROM:"  \
+                    , dk[j]     \
+                );
+                continue;
+            }
+            mounted = 0;
+            if (mnt[dk[j]]) {
+                mounted++;
+                for (i = 1; i <= mnt[dk[j]]; i++) {
+                    if (swap[sliceof[dk[j] i]]) {
+                        printf ("%'"$offset"'s %s (%sMB)\n"\
+                            , "SWAP PARTITION:"         \
+                            , sliceof[dk[j] i]          \
+                            , size[sliceof[dk[j] i]]    \
+                        );
+                    }
+                    else {
+                        printf ("%'"$offset"'s %s%s (%sMB, %s full)\n"\
+                            , "PARTITION:"              \
+                            , dk[j]                     \
+                            , parts[dk[j] i]            \
+                            , size[sliceof[dk[j] i]]    \
+                            , cap[sliceof[dk[j] i]]     \
+                        );
+                    }
+                }
+            }
+            if (mmnt[dk[j]]) {
+                mounted++;
+                for (i = 1; i <= mmnt[dk[j]]; i++) {
+                    printf ("%'"$offset"'s %s part of %s\n"\
+                        , "PARTITION:"              \
+                        , mpart[i dk[j]]            \
+                        , disksuite[mpart[i dk[j]]] \
+                    );
+                }
+            }
+            if (!mounted) {
+                printf ("%'"$offset"'s %s\n"    \
+                    , "PARTITION:"              \
+                    , "no mounted partitions"   \
+                );
+            }
+        }
+    }
+' $format_dat $mnttab -
+
+## << END disks <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN floppy disks >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+if [ "$devinfo" ]
+then
+    echo "$devinfo" |
+    awk '
+        /Node '\''fd'\''/ {
+            for (i = 1; i <= NF; i++) {
+                if ($i == "unit") unit = $(i+1);
+            }
+            split($0, x, "'\''");
+            n = substr(unit, 2, 1);
+            printf("%'"$offset"'s %s%d%s\n"\
+                , "FLOPPY:"             \
+                , "fd"                  \
+                , n                     \
+                , " (3.5-inch floppy)"  \
+            );
+        }
+    '
+else
+    cd /dev
+    for fd in fd[0-9]
+    do
+        { <${fd}c; } 2>&- && {
+            eval "
+                if [ \"$fd\" ]
+                then
+                    echo 3.5
+                else
+                    echo $fd
+                fi
+            "
+        } |
+        awk '
+            /No such/ {
+                next;
+            }
+
+            $1 == "3.5" {
+                printf ("%'"$offset"'s %s - %s\n"\
+                    , "FLOPPY:"         \
+                    , "'$fd'"           \
+                    , "3.5-inch floppy" \
+                );
+                next;
+            }
+
+            /^fd/ {
+                if (length("'$archk'") == 4) {
+                    printf ("%'"$offset"'s %s - %s\n"\
+                        , "FLOPPY:"             \
+                        , $1                    \
+                        , "5.25-inch floppy"    \
+                    );
+                }
+                else {
+                    printf ("%'"$offset"'s %s - %s\n"\
+                        , "FLOPPY:"             \
+                        , $1                    \
+                        , "3.5-inch floppy"     \
+                    );
+                }
+            }
+        '
+    done
+fi
+
+## << END floppy disks <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN tapes >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+cd /dev
+for tape in nrst[0-7] nrar[0-7] nrxt[0-7] nrtm[0-7]
+do
+    [ -c /dev/$tape ] &&
+    mt -f /dev/$tape status 2>&1 |
+    awk '
+        BEGIN {
+            tapetype = "unknown";
+        }
+
+        /No such device/ {
+            tapetype = 0;
+            exit;
+        }
+
+        /no tape loaded/ {
+            tapetype = "unknown (no tape loaded)";
+            exit;
+        }
+
+        /Device busy/ {
+            tapetype = "unknown (busy)";
+            exit;
+        }
+
+        /:$/ {
+            tapetype = substr($0, 1, length($0) - 1);
+        }
+ 
+        /QIC-24/ {
+            tapetype = tapetype " (60MB)";
+            exit;
+        }
+
+        /QIC-150/ {
+            tapetype = tapetype " (150MB)";
+            exit;
+        }
+
+        END {
+            if (tapetype) {
+                printf ("%'$offset's %s - %s\n"\
+                    , "TAPE:"   \
+                    , "'$tape'" \
+                    , tapetype  \
+                );
+            }
+        }
+    '
+done
+
+## << END tapes <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+## >> BEGIN cdroms >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ##
+
+[ $SVR4 ] || {
+    cd /dev
+    for cd in `echo sr*`
+    do
+        case `{ <$cd; } 2>&1` in
+            ''|*busy)
+                echo $cd
+                ;;
+        esac
+    done |
+    awk '
+        NR == 1 {
+            cds = $0;
+            next;
+        }
+
+        {
+            cds = cds ", " $0
+        }
+
+        END {
+            if (NR) {
+                printf ("%'"$offset"'s %s\n"\
+                    , "CDROM(S):"       \
+                    , cds               \
+                );
+            }
+        }
+    '    
+}
+
+## << END cdroms <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ##
+
+# << END main <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< #
+
