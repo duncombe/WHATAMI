@@ -141,21 +141,22 @@ for drive in $Drive; do
 	done
 done
 
-
 #
 # REMOTE MOUNTS
 #
 
 mount -t nfs,smb | awk '{print "    NETWORK MOUNT: ",$1,"mounted",$2,$3}'
-(
+if [ -e /etc/exports ]; then
+    (
  	showmount -d 2>&- || cat /etc/exports |
 	awk '/^[[:blank:]]*[^#]/{print $1}{while(/\\$/){getline}}'
-) | awk 'NR>1{print "        EXPORTING: ", $1}'
+    ) | awk 'NR>1{print "        EXPORTING: ", $1}'
+fi
 
 ### END of DISKS
 
 
-smbclient -L $HOSTNAME -N 2> /dev/null |
+smbclient -L $HOSTNAME -N  < /dev/null 2> /dev/null |
 	awk '
 	/^Domain/{
 		wg=gensub(/^[^\[]*\[([^\]]*).*$/,"\\1",1); 
@@ -187,6 +188,12 @@ echo "     DISTRIBUTION: " `cat /etc/redhat-release`
 echo "     DISTRIBUTION: " Debian `cat /etc/debian_version`
 [ -e /etc/SuSE-release ] &&
 echo "     DISTRIBUTION: " `head -n1 /etc/SuSE-release`
+DISTFILE=/etc/lsb-release
+if [ -e $DISTFILE ] ; then
+	cat $DISTFILE | grep DISTRIB_ID
+	cat $DISTFILE | grep DISTRIB_RELEASE
+	cat $DISTFILE | grep DISTRIB_CODENAME
+fi
 
 ( gcc -dumpversion >/dev/null 2>/dev/null ) &&
 echo "      GCC VERSION: " `gcc -dumpversion`
