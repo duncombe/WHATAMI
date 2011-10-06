@@ -197,6 +197,15 @@ fi
 
 ( gcc -dumpversion >/dev/null 2>/dev/null ) &&
 echo "      GCC VERSION: " `gcc -dumpversion`
+
+MATLAB_EXEC=`which matlab`
+[ -x $MATLAB_EXEC ] &&
+echo "   MATLAB VERSION: " `matlab -help | grep Revision`
+
+
+
+
+
 #     SunOS 5.x:
 #                    DATE: Sun Jul  5 11:05:30 PDT 1992
 #                    USER: root
