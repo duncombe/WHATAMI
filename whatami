@@ -132,7 +132,8 @@ done
 Drive=` mount | grep ^/dev | awk '{sub(/\/dev\//,"",$1);gsub(/[[:digit:]]/,"",$1); print $1}' | sort | uniq `
 
 
-Partition=` mount | grep ^/dev | awk '{print $1}' `
+# Partition=` mount | grep ^/dev | awk '{print $1}' `
+Partition=` mount | grep ^/dev | awk '{print $3}' `
 
 for drive in $Drive; do
 	for partition in $Partition; do
@@ -145,6 +146,7 @@ done
 # REMOTE MOUNTS
 #
 
+
 mount -t nfs,smb | awk '{print "    NETWORK MOUNT: ",$1,"mounted",$2,$3}'
 if [ -e /etc/exports ]; then
     (
@@ -155,8 +157,7 @@ fi
 
 ### END of DISKS
 
-
-smbclient -L $HOSTNAME -N  < /dev/null 2> /dev/null |
+smbclient -N -L $HOSTNAME < /dev/null 2> /dev/null |
 	awk '
 	/^Domain/{
 		wg=gensub(/^[^\[]*\[([^\]]*).*$/,"\\1",1); 
@@ -170,9 +171,7 @@ smbclient -L $HOSTNAME -N  < /dev/null 2> /dev/null |
 		print "            SHARE: ", share
 		}
 	/^[[:blank:]]*Sharename/{st=1; getline}
-'
-
-
+	'
 
 ############ OPERATING SYSTEM ###############################
 echo "###  SOFTWARE  ###"
