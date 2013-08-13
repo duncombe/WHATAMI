@@ -193,11 +193,15 @@ echo "     DISTRIBUTION: " `cat /etc/redhat-release`
 echo "     DISTRIBUTION: " Debian `cat /etc/debian_version`
 [ -e /etc/SuSE-release ] &&
 echo "     DISTRIBUTION: " `head -n1 /etc/SuSE-release`
+                # 'Mandrake'
+[ -e /etc/mandrake-release ] && 
+echo "     DISTRIBUTION: " `head -n1 /etc/mandrake-release` 
+
 DISTFILE=/etc/lsb-release
 if [ -e $DISTFILE ] ; then
-	cat $DISTFILE | grep DISTRIB_ID
-	cat $DISTFILE | grep DISTRIB_RELEASE
-	cat $DISTFILE | grep DISTRIB_CODENAME
+	cat $DISTFILE | awk '/DISTRIB_ID/{printf "%20s%s\n"," ",$0}'
+	cat $DISTFILE | awk '/DISTRIB_RELEASE/{printf "%20s%s\n"," ",$0}'
+	cat $DISTFILE | awk '/DISTRIB_CODENAME/{printf "%20s%s\n"," ",$0}'
 fi
 
 ( gcc -dumpversion >/dev/null 2>/dev/null ) &&
