@@ -138,7 +138,7 @@ Partition=` mount | grep ^/dev | awk '{print $3}' `
 for drive in $Drive; do
 	for partition in $Partition; do
 		df $partition |
-	awk '/'$drive'/{print "        PARTITION: ",$1,"mounted on",$6,"(" int($2/1024) "MiB, " $5 " full)"}' 
+	awk '/'${drive/\//\\/}'/{print "        PARTITION: ",$1,"mounted on",$6,"(" int($2/1024) "MiB, " $5 " full)"}' 
 	done
 done
 
@@ -198,7 +198,9 @@ echo "     DISTRIBUTION: " `head -n1 /etc/SuSE-release`
 echo "     DISTRIBUTION: " `head -n1 /etc/mandrake-release` 
 
 DISTFILE=/etc/lsb-release
-if [ -e $DISTFILE ] ; then
+if [ -x `which lsb_release` ] ; then 
+	lsb_release -a 
+elif [ -e $DISTFILE ] ; then
 	cat $DISTFILE | awk '/DISTRIB_ID/{printf "%20s%s\n"," ",$0}'
 	cat $DISTFILE | awk '/DISTRIB_RELEASE/{printf "%20s%s\n"," ",$0}'
 	cat $DISTFILE | awk '/DISTRIB_CODENAME/{printf "%20s%s\n"," ",$0}'
@@ -207,11 +209,13 @@ fi
 ( gcc -dumpversion >/dev/null 2>/dev/null ) &&
 echo "      GCC VERSION: " `gcc -dumpversion`
 
-MATLAB_EXEC=`which matlab`
-[ -x $MATLAB_EXEC ] &&
+MATLAB_EXEC=`which matlab 2> /dev/null`
+[ -x "$MATLAB_EXEC" ] &&
 echo "   MATLAB VERSION: " `matlab -help | grep Revision`
 
-
+PYTHON_EXEC=`which python`
+[ -x "$PYTHON_EXEC" ] &&
+echo "   PYTHON VERSION: " `python --version 2>&1`
 
 
 
