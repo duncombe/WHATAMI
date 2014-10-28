@@ -198,7 +198,7 @@ echo "     DISTRIBUTION: " `head -n1 /etc/SuSE-release`
 echo "     DISTRIBUTION: " `head -n1 /etc/mandrake-release` 
 
 DISTFILE=/etc/lsb-release
-if [ -x `which lsb_release` ] ; then 
+if [ -x "`which lsb_release 2> /dev/null`" ] ; then 
 	lsb_release -a 
 elif [ -e $DISTFILE ] ; then
 	cat $DISTFILE | awk '/DISTRIB_ID/{printf "%20s%s\n"," ",$0}'
