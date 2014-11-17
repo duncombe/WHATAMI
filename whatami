@@ -215,7 +215,7 @@ echo "   MATLAB VERSION: " `matlab -help | grep Revision`
 
 PYTHON_EXEC=`which python`
 [ -x "$PYTHON_EXEC" ] &&
-echo "   PYTHON VERSION: " `python --version 2>&1`
+echo "   PYTHON VERSION: " `python --version 2>&1 | sed 's/[Pp]ython//' `
 
 
 
